@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AP Attendance - Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        primary: '#4f46e5',
+                        brand: '#0ea5e9'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #f8fafc; }
+        .glass-card {
+            background: white;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 1rem;
+        }
+
+        /* --- Print Specific CSS for the ID Card --- */
+        @media print {
+            body * {
+                visibility: hidden;
+                background-color: white !important; /* Force true white */
+            }
+            #qr-modal, #qr-modal * {
+                visibility: visible;
+            }
+            #qr-modal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background: none !important; /* Remove backdrop tint */
+                display: block;
+            }
+            .no-print {
+                display: none !important;
+            }
+            @page {
+                margin: 0; /* Remove headers/footers */
+                size: portrait;
+            }
+            /* The physical card dimensions: CR80 (2.125" x 3.375") */
+            #id-card {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                width: 2.125in !important;
+                height: 3.375in !important;
+                box-shadow: none !important;
+                border: 1px dashed #ccc !important;
+                margin: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col items-center py-8 z-10 block">
+        <div class="text-2xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-primary mb-12">
+            AP Attendance
+        </div>
+        <nav class="flex flex-col gap-2 w-full px-4">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full text-left px-4 py-3 rounded-lg font-medium text-primary bg-primary/10 transition-colors">
+                Dashboard & Logs
+            </button>
+            <button onclick="switchTab('users')" id="nav-users" class="w-full text-left px-4 py-3 rounded-lg font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                Manage Students
+            </button>
+        </nav>
+        <div class="mt-auto px-4 w-full flex flex-col gap-2">
+            <a href="/" class="block text-center w-full bg-slate-100 text-slate-700 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 transition">
+                &larr; Back to Scanner
+            </a>
+            <a href="/logout" class="block text-center w-full bg-red-50 text-red-600 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition">
+                Log Out
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-8 relative z-0">
+        
+        <!-- DASHBOARD TAB -->
+        <div id="tab-dashboard" class="max-w-5xl mx-auto space-y-8 block">
+            <header>
+                <h1 class="text-3xl font-bold text-slate-900">Today's Attendance</h1>
+                <p class="text-slate-500 mt-1">Real-time attendance logs for <span id="current-date" class="font-medium text-slate-700"></span></p>
+            </header>
+
+            <div class="glass-card p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Activity Feed</h2>
+                    <div class="flex items-center gap-3">
+                        <select id="date-filter" class="border border-slate-300 bg-white rounded-lg px-3 py-1.5 text-sm outline-none shadow-sm font-medium" onchange="fetchAttendance()">
+                            <option value="today">Today</option>
+                            <option value="all">All Logs</option>
+                        </select>
+                        <button onclick="fetchAttendance()" class="text-sm text-white bg-primary px-3 py-1.5 rounded-lg font-medium hover:bg-primary/90 transition shadow-sm">Refresh</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-sm text-slate-500">
+                                <th class="pb-3 px-4 font-medium">Date</th>
+                                <th class="pb-3 px-4 font-medium">Student name</th>
+                                <th class="pb-3 px-4 font-medium">ID</th>
+                                <th class="pb-3 px-4 font-medium">In Time</th>
+                                <th class="pb-3 px-4 font-medium">Out Time</th>
+                                <th class="pb-3 px-4 font-medium text-right">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendance-list" class="divide-y divide-slate-100/50">
+                            <!-- populated via JS -->
+                            <tr><td colspan="4" class="text-center py-8 text-slate-400">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- USERS TAB -->
+        <div id="tab-users" class="max-w-5xl mx-auto space-y-8 hidden">
+            <header>
+                <h1 class="text-3xl font-bold text-slate-900">Manage Students</h1>
+                <p class="text-slate-500 mt-1">Add and manage students.</p>
+            </header>
+
+
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Add User Form -->
+                <div class="glass-card p-6 md:col-span-1 h-fit shadow-md">
+                    <h2 class="text-lg font-semibold mb-4 text-slate-800">Add New Student</h2>
+                    <form id="add-user-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                            <input type="text" id="add-name" required class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition" placeholder="John Doe">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Roll No / Student ID (Optional)</label>
+                            <input type="text" id="add-emp" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition" placeholder="STU-0001 (Auto-fills if empty)">
+                        </div>
+
+                        <button type="submit" class="w-full bg-primary text-white font-medium py-2 rounded-lg hover:bg-primary/90 transition shadow-md shadow-primary/30 mt-2">
+                            Create Student
+                        </button>
+                    </form>
+                    <p id="add-error" class="text-red-500 text-sm mt-3 hidden"></p>
+                </div>
+
+                <!-- Users List -->
+                <div class="glass-card p-6 md:col-span-2 shadow-md">
+                    <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                        <h2 class="text-lg font-semibold">Registered Students</h2>
+                        <div class="relative flex-1 max-w-xs">
+                            <input type="text" id="user-search" onkeyup="filterUsers()" placeholder="Search student name..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 absolute left-3 top-2.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-sm text-slate-500">
+                                    <th class="pb-3 px-4 font-medium">Name</th>
+                                    <th class="pb-3 px-4 font-medium">Emp ID</th>
+
+                                    <th class="pb-3 px-4 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-list" class="divide-y divide-slate-100">
+                                <!-- populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Details Modal -->
+        <div id="student-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h2 class="text-xl font-bold text-slate-800">Student Profile</h2>
+                    <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-6">
+                    <!-- Info Header -->
+                    <div class="flex items-center gap-6">
+                        <div class="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-3xl font-bold" id="detail-initials">JD</div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-slate-900" id="detail-name">Loading...</h3>
+                            <p class="text-slate-500 font-medium" id="detail-id">ID: ---</p>
+                            <p class="text-xs text-slate-400 mt-1">Registered on <span id="detail-joined">---</span></p>
+                        </div>
+                        <div class="ml-auto text-right">
+                            <span class="text-4xl font-black text-primary" id="detail-total-days">0</span>
+                            <p class="text-[0.6rem] uppercase tracking-widest font-bold text-slate-400">Total Days Present</p>
+                        </div>
+                    </div>
+
+                    <!-- History Table -->
+                    <div class="space-y-3">
+                        <h4 class="text-sm font-bold uppercase tracking-wider text-slate-500">Attendance History</h4>
+                        <div class="max-h-64 overflow-y-auto border border-slate-100 rounded-xl">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-50 text-slate-500 sticky top-0">
+                                    <tr>
+                                        <th class="py-2 px-4 font-semibold">Date</th>
+                                        <th class="py-2 px-4 font-semibold text-center">In Time</th>
+                                        <th class="py-2 px-4 font-semibold text-center">Out Time</th>
+                                        <th class="py-2 px-4 font-semibold text-right">Duration</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-history-list" class="divide-y divide-slate-100">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button onclick="closeStudentModal()" class="px-6 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-100 transition shadow-sm">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generated QR / ID Card Modal -->
+        <div id="qr-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50">
+            
+            <div class="flex flex-col items-center gap-4">
+                
+                <!-- The Printable ID Card (Portrait CR80 Size) -->
+                <!-- We set explicit print w and h. For screen, w-72 (288px) and h-auto gives a good visual proxy -->
+                <div id="id-card" class="bg-white rounded-xl shadow-2xl overflow-hidden w-72 flex flex-col relative print:-m-4 print:shadow-none">
+                    
+                    <!-- ID Header Background -->
+                    <div class="h-24 bg-gradient-to-br from-blue-600 to-indigo-800 w-full relative">
+                        <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 16px 16px;"></div>
+                        <div class="absolute bottom-2 inset-x-0 text-center">
+                            <span class="text-white/90 text-xs font-bold tracking-[0.2em] uppercase">AP Attendance Student</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Avatar Placeholder -->
+                    <div class="absolute top-12 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full border-4 border-white bg-slate-200 overflow-hidden flex items-center justify-center text-slate-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+
+                    <!-- User Information -->
+                    <div class="pt-12 pb-4 px-6 text-center flex-1">
+                        <h3 class="text-xl font-bold text-slate-800 leading-tight" id="modal-user-name">John Doe</h3>
+                        <p class="text-sm text-primary font-semibold mt-1" id="modal-emp-id">EMP-001</p>
+                        
+                        <!-- QR Code Area -->
+                        <div class="mt-4 inline-block bg-white border-2 border-slate-100 rounded-lg p-2">
+                            <img id="modal-qr-img" src="" alt="QR Code" class="w-32 h-32 object-contain mx-auto">
+                        </div>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div class="bg-slate-50 py-2 border-t border-slate-100 text-center text-[0.65rem] text-slate-400">
+                        Please scan this card at terminal for attendance
+                    </div>
+                </div>
+
+                <!-- Modal Controls (Hidden in Print) -->
+                <div class="no-print flex gap-3 w-72">
+                    <button onclick="closeQrModal()" class="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 rounded-lg font-medium transition backdrop-blur-md">Close</button>
+                    <button onclick="window.print()" class="flex-1 bg-white text-slate-900 py-2 rounded-lg font-medium shadow-lg hover:bg-slate-100 transition shadow-white/30 flex justify-center items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Print Card
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        document.getElementById('current-date').innerText = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        function switchTab(tab) {
+            document.getElementById('tab-dashboard').classList.add('hidden');
+            document.getElementById('tab-users').classList.add('hidden');
+            document.getElementById('nav-dashboard').className = "w-full text-left px-4 py-3 rounded-lg font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors";
+            document.getElementById('nav-users').className = "w-full text-left px-4 py-3 rounded-lg font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors";
+            
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`nav-${tab}`).className = "w-full text-left px-4 py-3 rounded-lg font-medium text-primary bg-primary/10 transition-colors";
+
+            if(tab === 'dashboard') fetchAttendance();
+            if(tab === 'users') fetchUsers();
+        }
+
+        // Helper to calculate time difference
+        function calculateDuration(inTimeStr, outTimeStr) {
+            if(!inTimeStr || !outTimeStr) return '--';
+            
+            const [inH, inM, inS] = inTimeStr.split(':').map(Number);
+            const [outH, outM, outS] = outTimeStr.split(':').map(Number);
+            
+            let inTotalSeconds = (inH || 0) * 3600 + (inM || 0) * 60 + (inS || 0);
+            let outTotalSeconds = (outH || 0) * 3600 + (outM || 0) * 60 + (outS || 0);
+            
+            // Handle if they worked past midnight
+            if(outTotalSeconds < inTotalSeconds) {
+                outTotalSeconds += 24 * 3600;
+            }
+            
+            const diffSeconds = outTotalSeconds - inTotalSeconds;
+            const hours = Math.floor(diffSeconds / 3600);
+            const minutes = Math.floor((diffSeconds % 3600) / 60);
+            
+            if (hours === 0 && minutes === 0) return '< 1m';
+            return `${hours}h ${minutes}m`;
+        }
+
+        // Helper to handle API 401 Unauthorized redirects
+        async function fetchWithAuth(url, options) {
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return null;
+            }
+            return res;
+        }
+
+        async function fetchAttendance() {
+            try {
+                const tbody = document.getElementById('attendance-list');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-primary font-medium">Refreshing logs...</td></tr>';
+                }
+
+                const dateFilter = document.getElementById('date-filter') ? document.getElementById('date-filter').value : 'today';
+                const res = await fetchWithAuth(`/api/attendance?date=${dateFilter}`);
+                if(!res) return;
+                
+                const data = await res.json();
+                
+                // Clear the 'Refreshing' message before adding real data
+                tbody.innerHTML = '';
+                
+                if(data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400">No attendance records found.</td></tr>';
+                    return;
+                }
+
+                data.forEach(log => {
+                    const duration = calculateDuration(log.in_time, log.out_time);
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="py-3 px-4 text-slate-500 text-sm font-medium">${log.date}</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">${log.name}</td>
+                            <td class="py-3 px-4 text-slate-500 text-sm">${log.emp_id}</td>
+                            <td class="py-3 px-4 text-emerald-600 font-semibold">${log.in_time || '--'}</td>
+                            <td class="py-3 px-4 text-blue-600 font-semibold">${log.out_time || '--'}</td>
+                            <td class="py-3 px-4 font-semibold text-purple-600 text-right">${duration}</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        let allUsers = []; // Global to store users for filtering
+
+        async function fetchUsers() {
+            try {
+                const res = await fetchWithAuth('/api/users');
+                if(!res) return;
+                
+                allUsers = await res.json();
+                renderUsers(allUsers);
+            } catch(e) { console.error(e); }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('users-list');
+            tbody.innerHTML = '';
+
+            users.forEach(user => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-3 px-4 font-medium text-slate-900">${user.name}</td>
+                        <td class="py-3 px-4 text-slate-500 text-sm">${user.emp_id}</td>
+                        <td class="py-3 px-4 text-right flex justify-end gap-2">
+                            <button onclick="fetchStudentDetails(${user.id})" class="text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-100 font-medium transition inline-flex items-center gap-1" title="View Full Details">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                Details
+                            </button>
+                            <button onclick="showQrModal('${user.name}', '${user.emp_id}', '${user.qr_token}')" class="text-sm bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-medium transition inline-flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" />
+                                </svg>
+                                ID Card
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filterUsers() {
+            const query = document.getElementById('user-search').value.toLowerCase();
+            const filtered = allUsers.filter(u => 
+                u.name.toLowerCase().includes(query) || 
+                u.emp_id.toLowerCase().includes(query)
+            );
+            renderUsers(filtered);
+        }
+
+
+
+        document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('add-name').value;
+            const emp_id = document.getElementById('add-emp').value;
+            const errorEl = document.getElementById('add-error');
+            errorEl.classList.add('hidden');
+
+            try {
+                const res = await fetchWithAuth('/api/users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, emp_id})
+                });
+                if(!res) return;
+                
+                const data = await res.json();
+                if(res.ok) {
+                    document.getElementById('add-name').value = '';
+                    document.getElementById('add-emp').value = '';
+                    fetchUsers();
+                    showQrModal(data.name, data.emp_id, data.qr_token);
+                } else {
+                    errorEl.innerText = data.error || 'Error creating user';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch(error) {
+                errorEl.innerText = 'Network Error';
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        async function fetchStudentDetails(userId) {
+            try {
+                const res = await fetchWithAuth(`/api/student/${userId}/history`);
+                if(!res) return;
+                const data = await res.json();
+                
+                document.getElementById('detail-name').innerText = data.name;
+                document.getElementById('detail-id').innerText = `ID: ${data.emp_id}`;
+                document.getElementById('detail-initials').innerText = data.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+                document.getElementById('detail-total-days').innerText = data.total_days;
+                document.getElementById('detail-joined').innerText = new Date(data.created_at).toLocaleDateString();
+                
+                const historyList = document.getElementById('detail-history-list');
+                historyList.innerHTML = '';
+                
+                if(data.history.length === 0) {
+                    historyList.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-slate-400">No attendance records yet.</td></tr>';
+                } else {
+                    data.history.forEach(log => {
+                        const duration = calculateDuration(log.in_time, log.out_time);
+                        historyList.innerHTML += `
+                            <tr>
+                                <td class="py-2.5 px-4 font-medium text-slate-700">${log.date}</td>
+                                <td class="py-2.5 px-4 text-center text-emerald-600 font-bold">${log.in_time || '--'}</td>
+                                <td class="py-2.5 px-4 text-center text-blue-600 font-bold">${log.out_time || '--'}</td>
+                                <td class="py-2.5 px-4 text-right font-bold text-slate-900">${duration}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                
+                document.getElementById('student-modal').classList.remove('hidden');
+            } catch(e) { console.error(e); alert("Failed to fetch student details."); }
+        }
+
+        function closeStudentModal() {
+            document.getElementById('student-modal').classList.add('hidden');
+        }
+
+        function showQrModal(name, emp_id, token) {
+            document.getElementById('modal-user-name').innerText = name;
+            document.getElementById('modal-emp-id').innerText = emp_id;
+            // Add a cache-busting token just in case
+            document.getElementById('modal-qr-img').src = `/api/qr/${token}`;
+            document.getElementById('qr-modal').classList.remove('hidden');
+        }
+
+        function closeQrModal() {
+            document.getElementById('qr-modal').classList.add('hidden');
+        }
+
+        // Init
+        fetchAttendance();
+    </script>
+</body>
+</html>
