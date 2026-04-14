@@ -7,18 +7,16 @@ import os
 import qrcode
 from io import BytesIO
 import logging
-from pytz import timezone
+
 
 app = Flask(__name__)
 app.secret_key = 'secure_attendance_key_123'  # Needed for session management
 DATABASE = 'attendance.db'
 
-# Timezone configuration
-IST = timezone('Asia/Kolkata')
-
 # Hardcoded Admin Credentials
 ADMIN_USER = 'admin'
 ADMIN_PASS = 'admin'
+
 
 
 def get_db():
@@ -58,19 +56,6 @@ def migrate_db():
 # Initialize the db on startup
 init_db()
 migrate_db()
-
-# --- Helper Function to Get IST Time ---
-def get_ist_time():
-    """Returns current time in Indian Standard Time"""
-    return datetime.datetime.now(IST)
-
-def get_ist_date():
-    """Returns current date in Indian Standard Time"""
-    return get_ist_time().date().isoformat()
-
-def get_ist_timestr():
-    """Returns current time in HH:MM:SS format in IST"""
-    return get_ist_time().strftime("%H:%M:%S")
 
 # --- Authentication Middleware ---
 def login_required(f):
@@ -158,28 +143,6 @@ def create_user():
         conn.close()
         return jsonify({'error': 'Roll No / Student ID already exists'}), 400
 
-@app.route('/api/users/<int:user_id>', methods=['DELETE'])
-@login_required
-def delete_user(user_id):
-    conn = get_db()
-    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
-    
-    if not user:
-        conn.close()
-        return jsonify({'error': 'Student not found'}), 404
-    
-    try:
-        # Delete attendance records first (foreign key constraint)
-        conn.execute('DELETE FROM attendance WHERE user_id = ?', (user_id,))
-        # Delete the user
-        conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
-        conn.commit()
-        conn.close()
-        return jsonify({'message': f'Student {user["name"]} deleted successfully'}), 200
-    except Exception as e:
-        conn.close()
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/qr/<qr_token>')
 def generate_qr(qr_token):
     img = qrcode.make(qr_token)
@@ -205,8 +168,8 @@ def scan_qr():
 
     user_id = user['id']
     display_name = user['name']
-    today = get_ist_date()  # IST Date
-    now_time = get_ist_timestr()  # IST Time
+    today = datetime.date.today().isoformat()
+    now_time = datetime.datetime.now().strftime("%H:%M:%S")
 
     # Check for the latest open session (In but no Out)
     att = conn.execute('''
@@ -229,13 +192,15 @@ def scan_qr():
     conn.commit()
     conn.close()
 
+
+
     return jsonify({
         'message': f'Attendance marked {status} successfully',
         'status': status,
         'user': display_name,
-        'time': now_time,
-        'timezone': 'IST (Asia/Kolkata)'
+        'time': now_time
     })
+
 
 
 @app.route('/api/attendance', methods=['GET'])
@@ -253,7 +218,7 @@ def get_attendance():
         '''
         logs = conn.execute(query).fetchall()
     else:
-        actual_date = get_ist_date() if date_filter == 'today' else date_filter
+        actual_date = datetime.date.today().isoformat() if date_filter == 'today' else date_filter
         query = '''
             SELECT a.id, u.name, u.emp_id, a.date, a.in_time, a.out_time
             FROM attendance a
@@ -289,6 +254,46 @@ def get_student_history(user_id):
     result['total_days'] = len(logs)
     
     return jsonify(result)
+
+@app.route('/api/backup/db')
+@login_required
+def backup_db():
+    if os.path.exists(DATABASE):
+        return send_file(DATABASE, as_attachment=True, download_name=f'attendance_backup_{datetime.date.today()}.db')
+    return jsonify({'error': 'Database file not found'}), 404
+
+@app.route('/api/backup/csv')
+@login_required
+def export_csv():
+    import csv
+    from io import StringIO
+    
+    conn = get_db()
+    query = '''
+        SELECT a.date, u.name, u.emp_id, a.in_time, a.out_time
+        FROM attendance a
+        JOIN users u ON a.user_id = u.id
+        ORDER BY a.date DESC, a.in_time DESC
+    '''
+    logs = conn.execute(query).fetchall()
+    conn.close()
+    
+    si = StringIO()
+    cw = csv.writer(si)
+    cw.writerow(['Date', 'Name', 'Student ID', 'In Time', 'Out Time'])
+    for log in logs:
+        cw.writerow([log['date'], log['name'], log['emp_id'], log['in_time'], log['out_time']])
+    
+    output = BytesIO()
+    output.write(si.getvalue().encode('utf-8'))
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'attendance_export_{datetime.date.today()}.csv'
+    )
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
