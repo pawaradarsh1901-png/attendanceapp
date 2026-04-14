@@ -7,16 +7,18 @@ import os
 import qrcode
 from io import BytesIO
 import logging
-
+from pytz import timezone
 
 app = Flask(__name__)
 app.secret_key = 'secure_attendance_key_123'  # Needed for session management
 DATABASE = 'attendance.db'
 
+# Timezone configuration
+IST = timezone('Asia/Kolkata')
+
 # Hardcoded Admin Credentials
 ADMIN_USER = 'admin'
 ADMIN_PASS = 'admin'
-
 
 
 def get_db():
@@ -56,6 +58,19 @@ def migrate_db():
 # Initialize the db on startup
 init_db()
 migrate_db()
+
+# --- Helper Function to Get IST Time ---
+def get_ist_time():
+    """Returns current time in Indian Standard Time"""
+    return datetime.datetime.now(IST)
+
+def get_ist_date():
+    """Returns current date in Indian Standard Time"""
+    return get_ist_time().date().isoformat()
+
+def get_ist_timestr():
+    """Returns current time in HH:MM:SS format in IST"""
+    return get_ist_time().strftime("%H:%M:%S")
 
 # --- Authentication Middleware ---
 def login_required(f):
@@ -168,8 +183,8 @@ def scan_qr():
 
     user_id = user['id']
     display_name = user['name']
-    today = datetime.date.today().isoformat()
-    now_time = datetime.datetime.now().strftime("%H:%M:%S")
+    today = get_ist_date()  # IST Date
+    now_time = get_ist_timestr()  # IST Time
 
     # Check for the latest open session (In but no Out)
     att = conn.execute('''
@@ -192,15 +207,13 @@ def scan_qr():
     conn.commit()
     conn.close()
 
-
-
     return jsonify({
         'message': f'Attendance marked {status} successfully',
         'status': status,
         'user': display_name,
-        'time': now_time
+        'time': now_time,
+        'timezone': 'IST (Asia/Kolkata)'
     })
-
 
 
 @app.route('/api/attendance', methods=['GET'])
@@ -218,7 +231,7 @@ def get_attendance():
         '''
         logs = conn.execute(query).fetchall()
     else:
-        actual_date = datetime.date.today().isoformat() if date_filter == 'today' else date_filter
+        actual_date = get_ist_date() if date_filter == 'today' else date_filter
         query = '''
             SELECT a.id, u.name, u.emp_id, a.date, a.in_time, a.out_time
             FROM attendance a
