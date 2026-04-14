@@ -221,7 +221,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                    <button id="detail-delete-btn" class="px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm font-bold hover:bg-red-100 transition inline-flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Delete Student
+                    </button>
                     <button onclick="closeStudentModal()" class="px-6 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-100 transition shadow-sm">Close</button>
                 </div>
             </div>
@@ -337,6 +341,9 @@
                         <td class="py-3 px-4 text-right flex justify-end gap-2">
                             <button onclick="fetchStudentDetails('${user.id}')" class="text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-100 font-medium transition inline-flex items-center gap-1">Details</button>
                             <button onclick="showQrModal('${user.name}', '${user.emp_id}', '${user.qr_token}')" class="text-sm bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-medium transition inline-flex items-center gap-1">ID Card</button>
+                            <button onclick="confirmDelete('${user.id}', '${user.name}')" class="text-sm bg-red-50 text-red-600 border border-red-100 p-1.5 rounded-lg hover:bg-red-100 transition" title="Delete Student">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -389,6 +396,10 @@
                 document.getElementById('detail-total-days').innerText = history.length;
                 document.getElementById('detail-joined').innerText = new Date(user.created_at).toLocaleDateString();
 
+                // Setup delete button in modal
+                const deleteBtn = document.getElementById('detail-delete-btn');
+                deleteBtn.onclick = () => confirmDelete(user.id, user.name, true);
+
                 const hList = document.getElementById('detail-history-list');
                 hList.innerHTML = history.length ? '' : '<tr><td colspan="4" class="py-8 text-center text-slate-400">No records yet.</td></tr>';
                 history.forEach(log => {
@@ -403,6 +414,22 @@
                 });
                 document.getElementById('student-modal').classList.remove('hidden');
             } catch (e) { console.error(e); }
+        }
+
+        async function confirmDelete(userId, name, fromModal = false) {
+            if (confirm(`Are you sure you want to delete ${name}? This will also delete all their attendance records.`)) {
+                try {
+                    const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        if (fromModal) closeStudentModal();
+                        fetchUsers();
+                        fetchAttendance(); // Refresh logs as well
+                    } else {
+                        const data = await response.json();
+                        alert(data.error || 'Failed to delete student');
+                    }
+                } catch (e) { console.error(e); }
+            }
         }
 
         function closeStudentModal() { document.getElementById('student-modal').classList.add('hidden'); }
