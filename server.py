@@ -214,6 +214,19 @@ def get_user_details(user_id):
         } for h in history]
     })
 
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    from flask import abort
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/backup/db')
 def backup_db():
     # Only allow logged in admins
