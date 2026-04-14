@@ -158,6 +158,28 @@ def create_user():
         conn.close()
         return jsonify({'error': 'Roll No / Student ID already exists'}), 400
 
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+    
+    if not user:
+        conn.close()
+        return jsonify({'error': 'Student not found'}), 404
+    
+    try:
+        # Delete attendance records first (foreign key constraint)
+        conn.execute('DELETE FROM attendance WHERE user_id = ?', (user_id,))
+        # Delete the user
+        conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'message': f'Student {user["name"]} deleted successfully'}), 200
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/qr/<qr_token>')
 def generate_qr(qr_token):
     img = qrcode.make(qr_token)
