@@ -7,6 +7,9 @@ import os
 import qrcode
 from io import BytesIO
 import logging
+import pytz
+
+IST = pytz.timezone('Asia/Kolkata')
 
 
 app = Flask(__name__)
@@ -132,13 +135,14 @@ def create_user():
         emp_id = f"STU-{next_val:04d}" # e.g., STU-0001
     
     qr_token = str(uuid.uuid4())
+    created_at = datetime.datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
     try:
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (name, emp_id, qr_token) VALUES (?, ?, ?)", (name, emp_id, qr_token))
+        cursor.execute("INSERT INTO users (name, emp_id, qr_token, created_at) VALUES (?, ?, ?, ?)", (name, emp_id, qr_token, created_at))
         conn.commit()
         new_id = cursor.lastrowid
         conn.close()
-        return jsonify({'id': new_id, 'name': name, 'emp_id': emp_id, 'qr_token': qr_token}), 201
+        return jsonify({'id': new_id, 'name': name, 'emp_id': emp_id, 'qr_token': qr_token, 'created_at': created_at}), 201
     except sqlite3.IntegrityError:
         conn.close()
         return jsonify({'error': 'Roll No / Student ID already exists'}), 400
@@ -182,8 +186,10 @@ def scan_qr():
 
     user_id = user['id']
     display_name = user['name']
-    today = datetime.date.today().isoformat()
-    now_time = datetime.datetime.now().strftime("%H:%M:%S")
+    
+    now_ist = datetime.datetime.now(IST)
+    today = now_ist.date().isoformat()
+    now_time = now_ist.strftime("%H:%M:%S")
 
     # Check for the latest open session (In but no Out)
     att = conn.execute('''
