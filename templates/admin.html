@@ -151,11 +151,11 @@
                     <form id="add-user-form" class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                            <input type="text" id="add-name" required class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition" placeholder="John Doe">
+                            <input type="text" id="add-name" required class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Roll No / Student ID (Optional)</label>
-                            <input type="text" id="add-emp" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition" placeholder="STU-0001 (Auto-fills if empty)">
+                            <input type="text" id="add-emp" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition">
                         </div>
 
                         <button type="submit" class="w-full bg-primary text-white font-medium py-2 rounded-lg hover:bg-primary/90 transition shadow-md shadow-primary/30 mt-2">
@@ -170,7 +170,7 @@
                     <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
                         <h2 class="text-lg font-semibold">Registered Students</h2>
                         <div class="relative flex-1 max-w-xs">
-                            <input type="text" id="user-search" onkeyup="filterUsers()" placeholder="Search student name..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition shadow-sm">
+                            <input type="text" id="user-search" onkeyup="filterUsers()" placeholder="Search student name..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 absolute left-3 top-2.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                         </div>
                     </div>
@@ -406,15 +406,19 @@
                         <td class="py-3 px-4 font-medium text-slate-900">${user.name}</td>
                         <td class="py-3 px-4 text-slate-500 text-sm">${user.emp_id}</td>
                         <td class="py-3 px-4 text-right flex justify-end gap-2">
-                            <button onclick="fetchStudentDetails(${user.id})" class="text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-100 font-medium transition inline-flex items-center gap-1" title="View Full Details">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            <button onclick="fetchStudentDetails(${user.id})" class="text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-100 font-medium transition flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 Details
                             </button>
-                            <button onclick="showQrModal('${user.name}', '${user.emp_id}', '${user.qr_token}')" class="text-sm bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-medium transition inline-flex items-center gap-1">
+                            <button onclick="showQrModal('${user.name}', '${user.emp_id}', '${user.qr_token}')" class="text-sm bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-medium transition flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" />
+                                  <path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4z" clip-rule="evenodd" />
                                 </svg>
                                 ID Card
+                            </button>
+                            <button onclick="deleteStudent(${user.id}, '${user.name}')" class="text-sm bg-red-50 text-red-700 border border-red-100 px-3 py-1.5 rounded-lg hover:bg-red-100 font-medium transition flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                Delete
                             </button>
                         </td>
                     </tr>
@@ -431,7 +435,29 @@
             renderUsers(filtered);
         }
 
+        async function deleteStudent(userId, studentName) {
+            if (!confirm(`Are you sure you want to delete student "${studentName}"? This action cannot be undone.`)) {
+                return;
+            }
 
+            try {
+                const res = await fetchWithAuth(`/api/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                if(!res) return;
+                
+                const data = await res.json();
+                if(res.ok) {
+                    alert(`Student "${studentName}" deleted successfully!`);
+                    fetchUsers();
+                } else {
+                    alert(`Error: ${data.error || 'Failed to delete student'}`);
+                }
+            } catch(error) {
+                alert('Network error: ' + error.message);
+            }
+        }
 
         document.getElementById('add-user-form').addEventListener('submit', async (e) => {
             e.preventDefault();
