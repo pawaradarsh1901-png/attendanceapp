@@ -143,6 +143,20 @@ def create_user():
         conn.close()
         return jsonify({'error': 'Roll No / Student ID already exists'}), 400
 
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    conn = get_db()
+    try:
+        conn.execute('DELETE FROM attendance WHERE user_id = ?', (user_id,))
+        conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
 @app.route('/api/qr/<qr_token>')
 def generate_qr(qr_token):
     img = qrcode.make(qr_token)
@@ -231,9 +245,9 @@ def get_attendance():
     conn.close()
     return jsonify([dict(l) for l in logs])
 
-@app.route('/api/student/<int:user_id>/history', methods=['GET'])
+@app.route('/api/users/<int:user_id>', methods=['GET'])
 @login_required
-def get_student_history(user_id):
+def get_user_details(user_id):
     conn = get_db()
     user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
     if not user:
@@ -249,11 +263,10 @@ def get_student_history(user_id):
     
     conn.close()
     
-    result = dict(user)
-    result['history'] = [dict(l) for l in logs]
-    result['total_days'] = len(logs)
-    
-    return jsonify(result)
+    return jsonify({
+        'user': dict(user),
+        'history': [dict(l) for l in logs]
+    })
 
 @app.route('/api/backup/db')
 @login_required
